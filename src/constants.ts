@@ -39,12 +39,7 @@ export const SHARE_LINKS: Social[] = [
     linkTitle: `Share this post on X`,
     icon: IconBrandX,
   },
-  {
-    name: "Telegram",
-    href: "https://t.me/share/url?url=",
-    linkTitle: `Share this post via Telegram`,
-    icon: IconTelegram,
-  },
+
   {
     name: "Pinterest",
     href: "https://pinterest.com/pin/create/button/?url=",
