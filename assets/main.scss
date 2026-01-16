@@ -1,0 +1,147 @@
+---
+# Only the main Sass file needs front matter (the dashes are enough)
+---
+
+// Minima Overrides
+$content-width: 1000px;
+$base-font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+$base-font-size: 17px;
+$base-line-height: 1.7;
+$brand-color: #2563eb;
+$text-color: #1f2937;
+$background-color: #ffffff;
+
+@import "minima";
+
+// Custom Styles
+
+// Improve Header
+.site-header {
+  border-top: 4px solid $brand-color;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.site-title {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+// Improve Typography
+h1, h2, h3, h4, h5, h6 {
+  color: #111827;
+  font-weight: 700;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+h1 { font-size: 2.25em; }
+h2 { font-size: 1.75em; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.3em; }
+h3 { font-size: 1.5em; }
+
+p {
+  margin-bottom: 1.5em;
+}
+
+a {
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+// Better Tables
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 2em 0;
+  font-size: 0.95em;
+
+  th, td {
+    border: 1px solid #e5e7eb;
+    padding: 12px;
+    text-align: left;
+  }
+
+  th {
+    background-color: #f9fafb;
+    font-weight: 600;
+    color: #374151;
+  }
+
+  tr:nth-child(even) {
+    background-color: #fcfcfd;
+  }
+}
+
+// Blockquotes
+blockquote {
+  border-left: 4px solid $brand-color;
+  background-color: #f3f4f6;
+  padding: 1em 1.5em;
+  color: #4b5563;
+  font-style: italic;
+  margin: 2em 0;
+  border-radius: 0 4px 4px 0;
+
+  p:last-child {
+    margin-bottom: 0;
+  }
+}
+
+// Code Blocks
+pre, code {
+  font-family: "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", monospace;
+  font-size: 0.9em;
+}
+
+code.highlighter-rouge {
+  background-color: #f3f4f6;
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  color: #ef4444; // Reddish for inline code usually looks good or standard grey
+}
+
+div.highlighter-rouge {
+  margin: 1.5em 0;
+
+  pre.highlight {
+    padding: 1em;
+    border-radius: 8px;
+    background-color: #1f2937; // Dark theme for code blocks
+    color: #f3f4f6;
+    overflow-x: auto;
+
+    code {
+      background-color: transparent;
+      padding: 0;
+      color: inherit;
+    }
+  }
+}
+
+// Mermaid
+.mermaid {
+  display: flex;
+  justify-content: center;
+  margin: 2em 0;
+  overflow-x: auto;
+  padding: 10px;
+  background-color: white;
+}
+
+// Post Content specific
+.post-content {
+  img {
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    max-width: 100%;
+    margin: 2em auto;
+    display: block;
+  }
+}
+
+// Buttons / UI Elements if any
+button, .btn {
+  cursor: pointer;
+}
