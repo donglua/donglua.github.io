@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "当 AI 遇见 GTD：我用 OpenClaw 把自己变成了“活体 GTD 引擎”"
+title: "告别“任务坟墓”：我用 OpenClaw 打造全自动 AI GTD 引擎"
 date: 2026-03-02 11:07:08 +0800
 categories: [技术, AI, GTD]
 tags: [OpenClaw, GTD, AI, 效率]
