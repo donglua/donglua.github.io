@@ -7,148 +7,73 @@ tags: [dd, macOS, NAS, 效率, 命令行]
 description: "在 macOS 上使用 dd 写盘时，将 /dev/diskN 替换为 /dev/rdiskN 可显著提升写入速度。本文从 BSD 设备模型的角度解析 disk 与 rdisk 的区别，并给出完整的操作流程。"
 ---
 
-## 背景
-
-最近在用 `dd` 给 NAS 写系统盘，发现写入速度很慢。排查后发现，macOS 下 `dd` 的目标设备选择对写入性能有很大影响——使用 `/dev/rdiskN` 替代 `/dev/diskN`，速度可以提升一个数量级。
-
-这其实是 BSD 系统中 **buffered device** 与 **raw device** 的经典区别，值得单独写一篇记录。
-
+---
+layout: post
+title: "macOS dd 命令提速：深入理解 rdisk 与 disk 的本质区别"
+date: 2026-03-05 09:15:00 +0800
+categories: [技术, macOS]
+tags: [dd, macOS, NAS, 效率, 命令行]
+description: "在 macOS 上使用 dd 写盘时，将 /dev/diskN 替换为 /dev/rdiskN 可显著提升写入速度。本文从 BSD 设备模型的角度解析 disk 与 rdisk 的区别，并给出最佳实践。"
 ---
 
-## disk 与 rdisk 的区别
+## 问题现象
 
-macOS 的 `/dev` 目录下，每块磁盘对应两个设备节点：
+在 macOS 上使用 `dd` 制作系统盘或写入大镜像时，默认使用 `/dev/diskN` 作为目标设备，写入速度往往极慢（例如 4GB 镜像需耗时 15 分钟以上）。
 
-| 设备路径 | 类型 | 说明 |
-|:---|:---|:---|
-| `/dev/disk4` | Buffered device | 经过内核 buffer cache |
-| `/dev/rdisk4` | Raw device | 绕过 buffer cache，直接操作设备 |
+## 根本原因
 
-`r` 即 **raw**。
+macOS 基于 Darwin 内核（继承自 BSD），其 `/dev` 目录下每块物理磁盘通常暴露两个设备节点：`diskN` 和 `rdiskN`。
 
-### 底层原理
+- **`/dev/diskN` (Buffered Device)**：走内核 Buffer Cache。数据从用户空间先拷贝到内核缓存，再由内核调度写入物理设备。带来额外的内存拷贝和管理开销。
+- **`/dev/rdiskN` (Raw Device)**：绕过内核缓存，直接进行块级物理 I/O。
 
-使用 buffered device 时，I/O 路径如下：
+对于 `dd` 这种大块连续顺序写入的工具，内核缓存毫无益处，只会成为性能瓶颈。
 
-```
-用户空间 → 内核 buffer cache → 磁盘驱动 → 物理设备
-```
+## 解决方案
 
-buffer cache 适合随机读写和小 I/O 场景，但对 `dd` 这类大块顺序写入反而是额外开销：
+将目标设备路径从 `diskN` 替换为带 `r` 前缀的原始设备 `rdiskN`（如 `/dev/rdisk4`）。速度提升可达 10 倍以上。
 
-- **多一次内存拷贝**：数据先拷贝到 buffer cache，再从 cache 写入设备
-- **缓冲管理开销**：内核需维护缓冲区元数据、执行 LRU 淘汰
-- **内存压力**：大量写入数据涌入 cache，可能触发页面回收
+### 最佳实践流程
 
-使用 raw device 时，I/O 路径简化为：
+1. **确认目标磁盘**
+   ```bash
+   diskutil list
+   ```
+   > ⚠️ 警告：务必反复确认目标设备编号（如 `disk4`），避免覆盖重要数据。
 
-```
-用户空间 → 磁盘驱动 → 物理设备
-```
+2. **卸载磁盘（非推出）**
+   必须先卸载卷才能使用 `dd` 进行底层覆盖：
+   ```bash
+   diskutil unmountDisk /dev/disk4
+   ```
 
-跳过 buffer cache，减少一次拷贝和相关管理开销，写入速度自然更快。
+3. **执行高写速写入**
+   使用 `rdisk` 结合合理的 `bs` (Block Size) 进行写入。macOS (BSD) 下的 `bs` 单位标志为小写 `m`。
+   ```bash
+   sudo dd if=TrueNAS-13.3.iso of=/dev/rdisk4 bs=1m
+   ```
 
-### 平台差异
+4. **查看进度**
+   写入过程中按 <kbd>Ctrl</kbd> + <kbd>T</kbd> 发送 `SIGINFO` 信号，可查看当前写入进度与速率。
 
-这是 **BSD 设备模型**的特性，macOS 底层基于 Darwin（XNU 内核），继承了这一设计。Linux 的块设备架构不同，没有 `rdisk` 的概念，但可以通过 `oflag=direct` 达到类似效果。
+5. **推出设备**
+   完成写入后安全弹出：
+   ```bash
+   diskutil eject /dev/disk4
+   ```
 
----
+## 拓展说明
 
-## 操作流程
-
-以写入 NAS 系统镜像到 U 盘为例。
-
-### 1. 确认目标磁盘
-
+### Linux 环境差异
+Linux 的块设备架构与 BSD 不同，没有 `rdisk` 的概念。在 Linux 环境下要实现绕过缓村的 Direct I/O 提速，需通过 `oflag=direct` 参数实现：
 ```bash
-diskutil list
+sudo dd if=image.iso of=/dev/sdX bs=1M oflag=direct
 ```
 
-找到目标设备，例如 `/dev/disk4`。**务必确认设备编号，避免误写其他磁盘。**
-
-### 2. 卸载磁盘
-
-```bash
-diskutil unmountDisk /dev/disk4
-```
-
-> 注意是 `unmountDisk`（卸载），不是 `eject`（推出）。推出后设备节点会消失。
-
-### 3. 写入镜像
-
-```bash
-# ❌ 使用 buffered device，较慢
-sudo dd if=TrueNAS-13.3.iso of=/dev/disk4 bs=1m
-
-# ✅ 使用 raw device，显著提速
-sudo dd if=TrueNAS-13.3.iso of=/dev/rdisk4 bs=1m
-```
-
-### 4. 推出设备
-
-```bash
-diskutil eject /dev/disk4
-```
-
----
-
-## 进阶用法
-
-### 查看写入进度
-
-macOS 的 `dd` 支持 `SIGINFO` 信号，写入过程中按 **`Ctrl + T`** 可输出当前进度：
-
-```
-4194304+0 records in
-4194304+0 records out
-4294967296 bytes transferred in 58.12 secs (73903245 bytes/sec)
-```
-
-### 使用 pv 显示实时进度条
-
+### 结合 pv 实现可视化进度条
+如果希望拥有直观的动态进度条，可结合 `pv` 工具使用：
 ```bash
 brew install pv
+# pv 负责读取并显示进度，通过管道交给 dd 裸写
 sudo sh -c 'pv TrueNAS-13.3.iso | dd of=/dev/rdisk4 bs=1m'
 ```
-
-输出示例：
-
-```
-2.10GiB 0:01:05 [67.8MiB/s] [===================>        ] 52% ETA 0:00:58
-```
-
-### bs 参数注意事项
-
-macOS（BSD）和 Linux（GNU）的 `dd` 在 `bs` 单位标记上有差异：
-
-| 平台 | 写法 | 含义 |
-|:---|:---|:---|
-| macOS (BSD) | `bs=1m` | 1 MiB（小写 m） |
-| Linux (GNU) | `bs=1M` | 1 MiB（大写 M） |
-
-一般设置在 `1m` ~ `4m` 之间即可，过大可能因对齐问题反而降低效率。
-
----
-
-## 性能对比
-
-以 4GB 系统镜像写入 USB 3.0 U 盘为参考：
-
-| 方式 | 命令 | 耗时 | 速度 |
-|:---|:---|:---|:---|
-| Buffered | `dd of=/dev/disk4 bs=1m` | ~15 min | ~4.5 MB/s |
-| **Raw** | `dd of=/dev/rdisk4 bs=1m` | **~1.5 min** | **~45 MB/s** |
-
-实际速度取决于硬件，但量级差距稳定存在。
-
----
-
-## 小结
-
-| 项目 | 内容 |
-|:---|:---|
-| 核心操作 | `/dev/diskN` → `/dev/rdiskN` |
-| 原理 | 绕过内核 buffer cache，减少内存拷贝 |
-| 来源 | BSD raw device 特性 |
-| 适用场景 | dd 写盘、制作启动盘、刷固件 |
-| 注意 | macOS 用 `bs=1m`（小写），Linux 用 `bs=1M`（大写） |

@@ -6,83 +6,44 @@ categories: android webview
 tags: android webview okhttp cookie
 ---
 
-## 背景
+---
+layout: post
+title: "Android WebView 拦截请求导致的会话不一致问题及解决方案"
+date: 2025-12-23 21:00:00 +0000
+categories: android webview
+tags: android webview okhttp cookie
+---
 
-在 Android 开发中，为了优化网络请求，我们经常会在 WebView 中使用 `shouldInterceptRequest` 方法拦截请求，并替换为 OkHttp 来执行。这样做的好处是可以使用 HTTPDNS、统一的网络配置、请求日志等。
+## 问题现象
 
-然而，如果只拦截部分请求（比如只拦截 GET 请求），就可能导致**会话（Session）不一致**的问题。
+在 Android 开发中，常通过重写 WebView 的 `shouldInterceptRequest` 方法，使用自定义网络栈（如 OkHttp）来接管部分资源请求（例如仅拦截 GET 请求以使用 HTTPDNS 或统一缓存）。
 
-## 问题描述
+这种**部分拦截**的策略极易引发一个严重问题：**会话（Session）不一致**。
+用户在登录后（原生网络栈 POST 请求），后续页面依然处于未登录状态；或图形验证码校验始终不过。
 
-典型的场景如下：
+## 根本原因
+
+会话不一致的根本原因是：**原生 WebView 的 `CookieManager` 与第三方网络库（OkHttp）的 Cookie 存储相互隔离且未同步。**
 
 ```
-用户登录流程：
-1. [GET] 加载登录页面 → 拦截走 OkHttp
-2. [POST] 提交登录表单 → 走 WebView 原生
-3. [GET] 获取用户信息 → 拦截走 OkHttp
+用户登录流程的时序割裂：
+1. [GET] 加载登录页面 → 被拦截，走 OkHttp 请求
+2. [POST] 提交登录表单 → 未被拦截，走 WebView 原生请求，服务端返回 Set-Cookie
+3. [GET] 获取用户信息 → 被拦截，走 OkHttp 请求
 ```
 
-问题出现在：
-- OkHttp 收到的 `Set-Cookie` 响应头没有同步到 WebView 的 `CookieManager`
-- WebView 设置的 Cookie 也可能没有同步到 OkHttp 的请求里
-
-这就导致 GET 请求和 POST 请求使用的是不同的 Session，服务端自然就认不出你了。
-
-## 问题代码
-
-```kotlin
-override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
-    // 只拦截 GET 请求
-    if ("GET".equals(request?.method, true)) {
-        return getResponseByOkHttp(request)
-    }
-    return super.shouldInterceptRequest(view, request)
-}
-
-private fun getResponseByOkHttp(request: WebResourceRequest?): WebResourceResponse? {
-    request ?: return null
-    val url = request.url.toString()
-    val requestBuilder = okhttp3.Request.Builder()
-        .url(url)
-        .method(request.method, null)
-    
-    // ❌ 问题1：直接使用 requestHeaders，未确认 Cookie 来源
-    request.requestHeaders?.forEach { (key, value) ->
-        requestBuilder.addHeader(key, value)
-    }
-    
-    val response = okhttpClient.newCall(requestBuilder.build()).execute()
-    
-    // ❌ 问题2：响应中的 Set-Cookie 被直接丢弃了！
-    
-    val body = response.body ?: return null
-    return WebResourceResponse(...)
-}
-```
+- WebView 原生请求收到的 `Set-Cookie` 会保存在 `CookieManager` 中。
+- 后续拦截走 OkHttp 的请求，如果没有提取并携带 `CookieManager` 中的 Cookie，或者 OkHttp 响应的 `Set-Cookie` 没有反向同步给 `CookieManager`，两套网络栈使用的就是不同的 Session 标识。
 
 ## 解决方案
 
-核心思路：**将 OkHttp 响应中的 `Set-Cookie` 同步到 WebView 的 `CookieManager`**。
+核心思路：**在拦截逻辑中，充当 Cookie 的双向同步桥梁。**
 
-### 修复后的代码
+> 注：`WebResourceRequest.requestHeaders` 在调用 `shouldInterceptRequest` 时，系统已经自动从 `CookieManager` 注水了最新的 Cookie，因此只需要关注**响应后**的 Cookie 回写。
+
+在拦截实现中增加响应后的 Cookie 同步逻辑：
 
 ```kotlin
-/**
- * 将响应中的 Set-Cookie 同步到 CookieManager
- */
-private fun syncCookiesToManager(url: String, response: okhttp3.Response) {
-    val cookies = response.headers("Set-Cookie")
-    if (cookies.isNotEmpty()) {
-        val cookieManager = android.webkit.CookieManager.getInstance()
-        cookies.forEach { 
-            Timber.d("syncCookiesToManager: $url -> $it")
-            cookieManager.setCookie(url, it) 
-        }
-        cookieManager.flush()  // 确保立即持久化
-    }
-}
-
 private fun getResponseByOkHttp(request: WebResourceRequest?): WebResourceResponse? {
     request ?: return null
     val url = request.url.toString()
@@ -90,16 +51,15 @@ private fun getResponseByOkHttp(request: WebResourceRequest?): WebResourceRespon
         .url(url)
         .method(request.method, null)
     
-    // ✅ 直接使用 requestHeaders
-    // WebView 在调用 shouldInterceptRequest 时已经从 CookieManager 获 取了 Cookie
+    // 1. 携带 WebView 已有的 Cookie (系统已注入到 requestHeaders)
     request.requestHeaders?.forEach { (key, value) ->
         requestBuilder.addHeader(key, value)
     }
     
     val response = okhttpClient.newCall(requestBuilder.build()).execute()
     
-    // ✅ 关键：同步响应中的 Cookie 到 CookieManager
-    // 注意：要在判断状态码之前同步，因为 302 重定向也可能带 Set-Cookie
+    // 2. 关键：同步响应头中的 Set-Cookie 到 WebView的 CookieManager
+    // 必须在判断状态码之前同步，以防 302 重定向丢失 Cookie
     syncCookiesToManager(url, response)
     
     if (response.code != 200) {
@@ -108,61 +68,32 @@ private fun getResponseByOkHttp(request: WebResourceRequest?): WebResourceRespon
     }
     
     val body = response.body ?: return null
-    // ... 构建 WebResourceResponse
+    // 构建并返回 WebResourceResponse...
 }
-```
 
-### 关键点解释
-
-1. **为什么只需要处理响应的 Cookie？**
-   
-   因为 `WebResourceRequest.requestHeaders` 已经包含了 WebView 从 `CookieManager` 获取的 Cookie。WebView 在调用 `shouldInterceptRequest` 之前 ，会自动把当前 URL 对应的 Cookie 放进 `requestHeaders` 里。
-
-2. **为什么要在判断状态码之前同步 Cookie？**
-   
-   HTTP 302 重定向响应也可能携带 `Set-Cookie`。如果先判断状态码再同步，就会丢失这些 Cookie。
-
-3. **`flush()` 的作用**
-   
-   `CookieManager.setCookie()` 是异步的，调用 `flush()` 可以确保 Cookie 立即持久化到磁盘，避免因为进程被杀而丢失。
-
-## 验证方法
-
-1. 在 `syncCookiesToManager` 添加日志，确认 Cookie 被正确同步
-2. 测试登录流程：登录 → 刷新页面 → 确认用户状态保持
-3. 测试验证码场景：获取验证码图片 → 提交验证码 → 确认校验通过
-
-## 其他注意事项
-
-### 不适合拦截的域名
-
-某些第三方域名（如支付页面）可能有额外的安全校验，建议排除：
-
-```kotlin
-val FILTER_HOSTS = listOf(
-    "qq.com",       // 腾讯
-    "alipay.com",   // 支付宝
-    // ...
-)
-
-private fun shouldInterceptToOkhttp(request: WebResourceRequest?): Boolean {
-    val url = request?.url ?: return false
-    if ("GET".equals(request.method, true)) {
-        // 过滤掉不需要拦截的域名
-        return FILTER_HOSTS.none { url.toString().contains(it) }
+/**
+ * 将 OkHttp 响应中的 Set-Cookie 写入 CookieManager
+ */
+private fun syncCookiesToManager(url: String, response: okhttp3.Response) {
+    val cookies = response.headers("Set-Cookie")
+    if (cookies.isNotEmpty()) {
+        val cookieManager = android.webkit.CookieManager.getInstance()
+        cookies.forEach { 
+            cookieManager.setCookie(url, it) 
+        }
+        cookieManager.flush()  // 确保立即持久化到本地，防止进程被杀导致丢失
     }
-    return false
 }
 ```
 
-### HTTPDNS 可能带来的问题
+## 扩展建议
 
-使用 HTTPDNS 会让请求直连 IP，但 HTTP 请求的 `Host` 头仍然是域名。某些 服务端可能对 IP 和 Host 做额外校验，需要注意。
+**1. 过滤第三方域名**
+并非所有请求都适合拦截。涉及第三方支付、授权的网页，建议通过白名单/黑名单机制过滤，让原生 WebView 自行处理，避免引发未知的安全或跨域 Cookie 异常。
 
-## 总结
+**2. HTTPDNS 附带效应**
+使用 HTTPDNS 替换域名为 IP 后发起请求，其真实的 `Host` 头需要手动补全，否则可能触发 CDN 阻断或服务端 Host 校验严格环境下的 400 错误。
 
-WebView 请求拦截是把双刃剑。用得好可以优化网络性能，用不好就会导致各种 诡异的会话问题。关键是要记住：
+## 小结
 
-> **拦截了请求，就要接管 Cookie 同步的责任。**
-
-希望这篇文章能帮助你少踩一个坑。
+WebView 请求拦截是优化利器，但**拦截了请求，就必须完整接管并维护 HTTP 的状态机（Cookie/Session）**。构建稳定的双向 Cookie 同步机制，是此类架构落地的必修课。
