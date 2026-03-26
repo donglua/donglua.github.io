@@ -32,6 +32,9 @@ theme: minima
 plugins:
   - jekyll-feed
 
+# 固定链接格式：去掉 :categories，避免中文出现在 URL 中
+permalink: /:year/:month/:day/:title/
+
 # Google Analytics
 google_analytics: G-R2012JP3KW
 
