@@ -14,6 +14,19 @@ tags: [AI, Claude Code, Multi-Agent, Source Analysis]
 
 ## 1. 物理隔离：零初始上下文与任务动态路由
 
+```mermaid
+graph TD
+    A[主控节点 Coordinator] --> B{任务分型决策}
+    B -- 封闭式任务/高安全性 --> C[Fresh Agent 零上下文]
+    B -- 开放式任务/高性能要求 --> D[Fork Subagent 侧链继承]
+    C --> E[执行独立闭环]
+    D -- 命中 --> F[Prompt Cache 缓存指针]
+    F --> G[执行快速冷启动]
+    E --> H[XML 通知回传]
+    G --> H
+    H --> I[主控语义综合]
+```
+
 在 Claude Code 中，隔离不是一种建议，而是一种**动态分析策略**。系统会根据任务的确定性（Determinism）自动选择起步路径。
 
 ### 封闭式任务：强制 Fresh Agent
