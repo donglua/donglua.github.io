@@ -1,19 +1,10 @@
 ---
 layout: post
-title: "macOS dd 命令提速：理解 rdisk 与 disk 的区别"
+title: 'macOS dd 命令提速：理解 rdisk 与 disk 的区别'
 date: 2026-03-05 09:15:00 +0800
 categories: [技术, macOS]
 tags: [dd, macOS, NAS, 效率, 命令行]
-description: "在 macOS 上使用 dd 写盘时，将 /dev/diskN 替换为 /dev/rdiskN 可显著提升写入速度。本文从 BSD 设备模型的角度解析 disk 与 rdisk 的区别，并给出完整的操作流程。"
----
-
----
-layout: post
-title: "macOS dd 命令提速：深入理解 rdisk 与 disk 的本质区别"
-date: 2026-03-05 09:15:00 +0800
-categories: [技术, macOS]
-tags: [dd, macOS, NAS, 效率, 命令行]
-description: "在 macOS 上使用 dd 写盘时，将 /dev/diskN 替换为 /dev/rdiskN 可显著提升写入速度。本文从 BSD 设备模型的角度解析 disk 与 rdisk 的区别，并给出最佳实践。"
+description: '在 macOS 上使用 dd 写盘时，将 /dev/diskN 替换为 /dev/rdiskN 可显著提升写入速度。本文从 BSD 设备模型的角度解析 disk 与 rdisk 的区别，并给出完整的操作流程。'
 ---
 
 ## 问题现象
@@ -39,7 +30,7 @@ macOS 基于 Darwin 内核（继承自 BSD），其 `/dev` 目录下每块物理
    ```bash
    diskutil list
    ```
-   > ⚠️ 警告：务必反复确认目标设备编号（如 `disk4`），避免覆盖重要数据。
+   > 注意：务必反复确认目标设备编号（如 `disk4`），避免覆盖重要数据。
 
 2. **卸载磁盘（非推出）**
    必须先卸载卷才能使用 `dd` 进行底层覆盖：
@@ -47,8 +38,8 @@ macOS 基于 Darwin 内核（继承自 BSD），其 `/dev` 目录下每块物理
    diskutil unmountDisk /dev/disk4
    ```
 
-3. **执行高写速写入**
-   使用 `rdisk` 结合合理的 `bs` (Block Size) 进行写入。macOS (BSD) 下的 `bs` 单位标志为小写 `m`。
+3. **执行高速写入**
+   使用 `rdisk` 结合合理的 `bs`（Block Size）写入。macOS（BSD）下 `bs` 单位标志为小写 `m`。
    ```bash
    sudo dd if=TrueNAS-13.3.iso of=/dev/rdisk4 bs=1m
    ```
@@ -65,12 +56,14 @@ macOS 基于 Darwin 内核（继承自 BSD），其 `/dev` 目录下每块物理
 ## 拓展说明
 
 ### Linux 环境差异
-Linux 的块设备架构与 BSD 不同，没有 `rdisk` 的概念。在 Linux 环境下要实现绕过缓村的 Direct I/O 提速，需通过 `oflag=direct` 参数实现：
+
+Linux 的块设备架构与 BSD 不同，没有 `rdisk` 的概念。在 Linux 环境下要实现绕过缓存的 Direct I/O 提速，需通过 `oflag=direct` 参数实现：
 ```bash
 sudo dd if=image.iso of=/dev/sdX bs=1M oflag=direct
 ```
 
 ### 结合 pv 实现可视化进度条
+
 如果希望拥有直观的动态进度条，可结合 `pv` 工具使用：
 ```bash
 brew install pv
