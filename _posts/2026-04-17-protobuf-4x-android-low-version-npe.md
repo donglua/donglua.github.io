@@ -101,8 +101,6 @@ Object value = UnsafeUtil.getObject(message, fieldOffset);
 ```gradle
 buildscript {
     repositories {
-        maven { url 'https://storage.googleapis.com/r8-releases/raw' }
-        maven { url 'https://mirrors.huaweicloud.com/repository/maven/' }
         mavenCentral()
         google()
     }
