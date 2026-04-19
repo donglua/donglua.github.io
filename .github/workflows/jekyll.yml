@@ -11,8 +11,11 @@ on:
   push:
     branches: ["main"]
 
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+
+  # 每天北京时间早上 8 点（UTC 0:00）自动运行一次，确保预发布的博文能准时上线
+  schedule:
+    - cron: '0 0 * * *'
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
