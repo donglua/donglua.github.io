@@ -1,0 +1,28 @@
+---
+# Only the main Sass file needs front matter (the dashes are enough)
+---
+
+@import "minima";
+
+// ==========================================================================
+// 微信公众号风格自定义样式 (WeChat Official Account Style Override)
+// ==========================================================================
+
+// 字体优化
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", Arial, sans-serif;
+  color: #333333;
+  letter-spacing: 0.5px;
+}
+
+// 正文排版：两端对齐
+.post-content {
+  font-size: 16px;
+  line-height: 1.75;
+  color: #333333;
+
+  p {
+    margin-bottom: 24px;
+    text-align: justify; // 两端对齐，公众号常见排版
+  }
+}
