@@ -8,7 +8,7 @@ tags: [Android, EventBus, Guava, ART, PictureInPicture, 崩溃分析]
 
 ## 背景
 
-在上线前的兼容测试中，发现低版本设备（Android 11 及以下）出现稳定崩溃，高版本设备无异常。崩溃入口直指 Guava EventBus 的 `register()` 调用。
+在近期的一次项目依赖升级（主要涉及 AndroidX 相关库的升级）后，并在上线前的兼容测试中，发现低版本设备（Android 11 及以下）出现稳定崩溃，而升级前一切正常。高版本设备无异常。崩溃入口直指 Guava EventBus 的 `register()` 调用。
 
 ---
 
