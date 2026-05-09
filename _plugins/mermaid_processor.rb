@@ -4,6 +4,10 @@ Jekyll::Hooks.register [:posts, :pages], :post_render do |doc|
   # Only process HTML documents
   if doc.output_ext == '.html'
     content = doc.output
+
+    # Skip processing if the document doesn't contain any mermaid diagrams
+    next unless content.include?('language-mermaid')
+
     # Using Nokogiri to parse the HTML
     fragment = Nokogiri::HTML::DocumentFragment.parse(content)
 
