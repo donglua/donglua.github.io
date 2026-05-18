@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "为什么 TextView 在小尺寸角标里永远居不了中"
-date: 2026-05-18 16:00:00 +0800
+date: 2026-05-18 13:00:00 +0800
 categories: [技术, Android]
 tags: [Android, Custom View, Typography, Font Metrics]
 description: "TextView 的 gravity=center 基于 font metrics 定位文字，而 font metrics 包含了大量不可见的预留空间。当容器足够小时，这种偏移肉眼可见。解法是用 Paint.getTextBounds() 拿到实际墨水区域，自己做居中。"
