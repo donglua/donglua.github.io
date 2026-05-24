@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "FastInflater：通过 View 池化消除重复 XML inflate 开销"
-date: 2026-05-24 14:00:00 +0800
+date: 2026-05-24 17:49:00 +0800
 categories: [技术, Android]
 tags: [Android, Performance, LayoutInflater, View Pool, RecyclerView]
 description: "Android XML 布局的 inflate 是纯 CPU 密集操作——解析 XML、反射创建 View、递归构建 View 树。FastInflater 通过池化复用已创建的 View 树，让高频布局的 inflate 耗时从几十毫秒降到零。本文深入分析其架构设计、池键隔离策略、异步预热降级机制和生命周期安全模型。"
