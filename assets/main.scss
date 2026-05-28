@@ -15,7 +15,7 @@ body {
   letter-spacing: 0.5px;
 }
 
-// 正文排版：两端对齐
+// 正文排版：左对齐
 .post-content {
   font-size: 16px;
   line-height: 1.75;
@@ -23,6 +23,6 @@ body {
 
   p {
     margin-bottom: 24px;
-    text-align: justify; // 两端对齐，公众号常见排版
+    text-align: left;
   }
 }
