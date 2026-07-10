@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Android 多渠道打包终极方案：用 Python 直接原位修改 AXML 二进制
+title: Android 多渠道打包终极方案：直接原位修改 AXML 二进制
 date: 2026-07-10 13:30:00 +0800
 categories: [Android, 逆向工程, 自动化打包]
 tags: [Android, Python, AXML, 自动化, 多渠道打包]
